@@ -1,49 +1,87 @@
 #!/bin/bash
 
-# Function to send an email with an attached image
-send_email() {
-  local recipient="$1"
-  local subject="$2"
-  local body="$3"
-  local attachment="$4"
+# Define the input CSV file
+CSV_FILE="input.csv"
 
-  # Construct the mail command
-  mail -s "$subject" "$recipient" <<EOF
-From: Your Name <your_email@example.com>
+# Define a temporary HTML file
+HTML_FILE="email_body.html"
 
-$body
+# Check if the CSV file exists
+if [[ ! -f "$CSV_FILE" ]]; then
+  echo "Error: CSV file not found!"
+  exit 1
+fi
 
-EOF
-  # Attach the image
-  uuencode "$attachment" "image.png" | mail -s "$subject" "$recipient" -a "image.png"
-}
+# Read CSV line by line (skipping the header)
+tail -n +2 "$CSV_FILE" | while IFS=',' read -r BU email file_path; do
+  # Check if the file path exists
+  if [[ ! -f "$file_path" ]]; then
+    echo "Error: File path $file_path not found for $email!"
+    continue
+  fi
 
-# Read data from CSV file
-while IFS=, read -r dept email png_path
-do
-  # Create HTML content with image
-  html_body=$(cat <<EOF
+  # Generate the HTML content
+  cat > "$HTML_FILE" <<EOF
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 20px;
+      background-color: #f4f4f4;
+      border: 1px solid #ddd;
+    }
+    .image-container {
+      text-align: center;
+      margin-top: 20px;
+    }
     img {
       max-width: 100%;
       height: auto;
+      border: 1px solid #ccc;
     }
   </style>
+  <title>Email</title>
 </head>
 <body>
-  <h2>Department: ${dept}</h2>
-  <img src="cid:image.png" alt="Image">
+  <h1>Hello ${BU} Team,</h1>
+  <p>Please find the image below:</p>
+  <div class="image-container">
+    <img src="cid:image1" alt="Embedded Image">
+  </div>
+  <p>Best regards,<br>Your Automation Script</p>
 </body>
 </html>
 EOF
-  )
 
-  # Send email with attachment
-  send_email "$email" "Image from ${dept}" "$html_body" "$png_path"
+  # Send the email with the embedded image
+  (
+    echo "To: $email"
+    echo "Subject: Image Email for $BU"
+    echo "MIME-Version: 1.0"
+    echo "Content-Type: multipart/related; boundary=\"boundary\""
+    echo
+    echo "--boundary"
+    echo "Content-Type: text/html; charset=UTF-8"
+    echo "Content-Transfer-Encoding: 7bit"
+    echo
+    cat "$HTML_FILE"
+    echo "--boundary"
+    echo "Content-Type: image/jpeg"
+    echo "Content-Disposition: inline; filename=$(basename "$file_path")"
+    echo "Content-ID: <image1>"
+    echo "Content-Transfer-Encoding: base64"
+    echo
+    base64 "$file_path"
+    echo "--boundary--"
+  ) | sendmail -t
 
-done < "your_data.csv"
+  echo "Email sent to $email with image $file_path."
+done
 
-echo "Emails sent successfully."
+# Cleanup
+rm -f "$HTML_FILE"
