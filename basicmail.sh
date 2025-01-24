@@ -1,87 +1,52 @@
 #!/bin/bash
 
-# Define the input CSV file
-CSV_FILE="input.csv"
-
-# Define a temporary HTML file
-HTML_FILE="email_body.html"
+# CSV file path
+CSV_FILE="data.csv"
 
 # Check if the CSV file exists
 if [[ ! -f "$CSV_FILE" ]]; then
-  echo "Error: CSV file not found!"
+  echo "CSV file not found: $CSV_FILE"
   exit 1
 fi
 
-# Read CSV line by line (skipping the header)
-tail -n +2 "$CSV_FILE" | while IFS=',' read -r BU email file_path; do
-  # Check if the file path exists
-  if [[ ! -f "$file_path" ]]; then
-    echo "Error: File path $file_path not found for $email!"
+# Loop through the CSV file line by line (excluding the header row)
+tail -n +2 "$CSV_FILE" | while IFS=, read -r BU email file_path; do
+
+  # Check if all required fields are available
+  if [[ -z "$BU" || -z "$email" || -z "$file_path" ]]; then
+    echo "Missing data in CSV row. Skipping..."
     continue
   fi
 
-  # Generate the HTML content
-  cat > "$HTML_FILE" <<EOF
+  # Create the HTML content
+  HTML_CONTENT=$(cat <<EOF
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image for $BU</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
-      padding: 20px;
-      background-color: #f4f4f4;
-      border: 1px solid #ddd;
-    }
-    .image-container {
       text-align: center;
-      margin-top: 20px;
+      padding: 20px;
     }
     img {
       max-width: 100%;
       height: auto;
-      border: 1px solid #ccc;
     }
   </style>
-  <title>Email</title>
 </head>
 <body>
-  <h1>Hello ${BU} Team,</h1>
-  <p>Please find the image below:</p>
-  <div class="image-container">
-    <img src="cid:image1" alt="Embedded Image">
-  </div>
-  <p>Best regards,<br>Your Automation Script</p>
+  <h1>Business Unit: $BU</h1>
+  <p>Attached is the image for BU $BU.</p>
+  <img src="$file_path" alt="Image for $BU">
 </body>
 </html>
 EOF
+  )
 
-  # Send the email with the embedded image
-  (
-    echo "To: $email"
-    echo "Subject: Image Email for $BU"
-    echo "MIME-Version: 1.0"
-    echo "Content-Type: multipart/related; boundary=\"boundary\""
-    echo
-    echo "--boundary"
-    echo "Content-Type: text/html; charset=UTF-8"
-    echo "Content-Transfer-Encoding: 7bit"
-    echo
-    cat "$HTML_FILE"
-    echo "--boundary"
-    echo "Content-Type: image/jpeg"
-    echo "Content-Disposition: inline; filename=$(basename "$file_path")"
-    echo "Content-ID: <image1>"
-    echo "Content-Transfer-Encoding: base64"
-    echo
-    base64 "$file_path"
-    echo "--boundary--"
-  ) | sendmail -t
+  # Send the email using `mail` or `sendmail`
+  echo "$HTML_CONTENT" | mail -a "Content-Type: text/html" -s "Image for $BU" "$email"
 
-  echo "Email sent to $email with image $file_path."
+  echo "Email sent to $email for BU: $BU"
 done
-
-# Cleanup
-rm -f "$HTML_FILE"
