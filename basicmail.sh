@@ -50,3 +50,54 @@ EOF
 
   echo "Email sent to $email for BU: $BU"
 done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#!/bin/bash
+
+# Variables
+TO_EMAIL="recipient@example.com"
+SUBJECT="Subject of the Email"
+FROM_EMAIL="sender@example.com"
+HTML_CONTENT="<html><body><h1>Hello!</h1><p>This is an email with a PNG attachment.</p></body></html>"
+ATTACHMENT="image.png"
+
+# Boundary for separating content
+BOUNDARY="====$(date +%s)===="
+
+# Create the email content
+{
+echo "From: $FROM_EMAIL"
+echo "To: $TO_EMAIL"
+echo "Subject: $SUBJECT"
+echo "MIME-Version: 1.0"
+echo "Content-Type: multipart/mixed; boundary=\"$BOUNDARY\""
+echo
+echo "--$BOUNDARY"
+echo "Content-Type: text/html; charset=\"utf-8\""
+echo "Content-Transfer-Encoding: 7bit"
+echo
+echo "$HTML_CONTENT"
+echo
+echo "--$BOUNDARY"
+echo "Content-Type: image/png"
+echo "Content-Transfer-Encoding: base64"
+echo "Content-Disposition: attachment; filename=\"$(basename $ATTACHMENT)\""
+echo
+base64 "$ATTACHMENT"
+echo
+echo "--$BOUNDARY--"
+} | sendmail -t
+
+echo "Email sent to $TO_EMAIL with attachment $ATTACHMENT."
