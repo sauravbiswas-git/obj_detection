@@ -107,4 +107,63 @@ echo "Email sent to $TO"
 
 
 
+#!/bin/bash
+
+# CSV file path
+CSV_FILE="email_data.csv"
+
+# Check if CSV file exists
+if [[ ! -f "$CSV_FILE" ]]; then
+    echo "Error: CSV file not found."
+    exit 1
+fi
+
+# Read the CSV file (skip the header)
+tail -n +2 "$CSV_FILE" | while IFS=',' read -r FROM TO SUBJECT PNG_FILE; do
+    # Remove quotes from SUBJECT and PNG_FILE if present
+    SUBJECT=$(echo "$SUBJECT" | sed 's/^"//;s/"$//')
+    PNG_FILE=$(echo "$PNG_FILE" | sed 's/^"//;s/"$//')
+
+    # Check if the PNG file exists
+    if [[ ! -f "$PNG_FILE" ]]; then
+        echo "Error: PNG file '$PNG_FILE' not found."
+        continue
+    fi
+
+    # Boundary for email parts
+    BOUNDARY="=====BOUNDARY====="
+
+    # Encode the PNG file in base64
+    ENCODED_PNG=$(base64 "$PNG_FILE")
+
+    # Create the email
+    (
+    echo "From: $FROM"
+    echo "To: $TO"
+    echo "Subject: $SUBJECT"
+    echo "MIME-Version: 1.0"
+    echo "Content-Type: multipart/mixed; boundary=\"$BOUNDARY\""
+    echo
+    echo "--$BOUNDARY"
+    echo "Content-Type: text/html; charset=\"utf-8\""
+    echo "Content-Transfer-Encoding: 7bit"
+    echo
+    echo "<html><body><p>This is a test email with an attachment.</p></body></html>"
+    echo
+    echo "--$BOUNDARY"
+    echo "Content-Type: image/png; name=\"$(basename "$PNG_FILE")\""
+    echo "Content-Transfer-Encoding: base64"
+    echo "Content-Disposition: attachment; filename=\"$(basename "$PNG_FILE")\""
+    echo
+    echo "$ENCODED_PNG"
+    echo
+    echo "--$BOUNDARY--"
+    ) | sendmail -t
+
+    echo "Email sent to $TO with subject '$SUBJECT'."
+done
+
+
+
+
 
