@@ -56,48 +56,55 @@ done
 
 
 
-
-
-
-
-
-
-
-
 #!/bin/bash
 
 # Variables
-TO_EMAIL="recipient@example.com"
-SUBJECT="Subject of the Email"
-FROM_EMAIL="sender@example.com"
-HTML_CONTENT="<html><body><h1>Hello!</h1><p>This is an email with a PNG attachment.</p></body></html>"
-ATTACHMENT="image.png"
+TO="recipient@example.com"
+SUBJECT="Here is your PNG file"
+PNG_FILE="/path/to/image.png"
+TMP_HTML="/tmp/email.html"
 
-# Boundary for separating content
-BOUNDARY="====$(date +%s)===="
+# Create the HTML content
+cat <<EOF > $TMP_HTML
+<html>
+<body>
+    <h1>Hello,</h1>
+    <p>Please find the PNG file attached below:</p>
+    <img src="cid:image.png" alt="PNG Image">
+</body>
+</html>
+EOF
 
-# Create the email content
-{
-echo "From: $FROM_EMAIL"
-echo "To: $TO_EMAIL"
+# Send the email with inline image
+(
+echo "To: $TO"
 echo "Subject: $SUBJECT"
-echo "MIME-Version: 1.0"
-echo "Content-Type: multipart/mixed; boundary=\"$BOUNDARY\""
+echo "Content-Type: multipart/related; boundary=\"boundary\""
 echo
-echo "--$BOUNDARY"
-echo "Content-Type: text/html; charset=\"utf-8\""
-echo "Content-Transfer-Encoding: 7bit"
+echo "--boundary"
+echo "Content-Type: text/html; charset=UTF-8"
 echo
-echo "$HTML_CONTENT"
-echo
-echo "--$BOUNDARY"
-echo "Content-Type: image/png"
+cat $TMP_HTML
+echo "--boundary"
+echo "Content-Type: image/png; name=\"image.png\""
 echo "Content-Transfer-Encoding: base64"
-echo "Content-Disposition: attachment; filename=\"$(basename $ATTACHMENT)\""
+echo "Content-Disposition: inline; filename=\"image.png\""
+echo "Content-ID: <image.png>"
 echo
-base64 "$ATTACHMENT"
-echo
-echo "--$BOUNDARY--"
-} | sendmail -t
+base64 $PNG_FILE
+echo "--boundary--"
+) | sendmail -t
 
-echo "Email sent to $TO_EMAIL with attachment $ATTACHMENT."
+# Cleanup
+rm -f $TMP_HTML
+
+echo "Email sent to $TO"
+
+
+
+
+
+
+
+
+
